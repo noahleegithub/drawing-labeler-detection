@@ -3,7 +3,7 @@
 A static, local-only browser tool for labeling **symbols and elements** in
 construction drawings with bounding boxes for object-detection training.
 
-**Project page:** https://noahleegithub.github.io/drawing-symbol-labeler/
+**Project page:** https://noahleegithub.github.io/drawing-labeler-detection/
 
 ## What it does
 
