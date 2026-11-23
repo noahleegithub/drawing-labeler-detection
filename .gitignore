@@ -1,0 +1,10 @@
+*.pdf
+*-labels.json
+*-labels.csv
+*.symbol-project.json
+*-dataset.zip
+*-yolo-labels.zip
+.env
+dist/
+__pycache__/
+.DS_Store

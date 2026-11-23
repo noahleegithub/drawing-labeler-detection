@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Local-only bounding-box labeler for construction drawing symbols and elements.">
+  <title>Symbol Labeler</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <strong>Symbol Labeler</strong>
+        <span>Bounding boxes for detection datasets</span>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="local-badge">Local only · PDFs never upload</span>
+      <button id="importBtn" class="button ghost" type="button">Import project</button>
+      <button id="exportJsonBtn" class="button primary" type="button">Export project</button>
+      <input id="importInput" type="file" accept="application/json,.json" hidden>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <aside class="sidebar left-sidebar">
+      <section class="panel upload-panel">
+        <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Upload a PDF">
+          <input id="fileInput" type="file" accept="application/pdf,.pdf" hidden>
+          <span class="drop-icon" aria-hidden="true">PDF</span>
+          <strong>Drop a drawing PDF</strong>
+          <span>or click to choose</span>
+        </div>
+        <div id="fileMeta" class="file-meta" hidden>
+          <div class="file-name" id="fileName"></div>
+          <div class="file-sub" id="fileSub"></div>
+          <button id="clearFileBtn" class="text-button" type="button">Load another</button>
+        </div>
+      </section>
+
+      <section class="panel classes-panel">
+        <div class="panel-head">
+          <div>
+            <strong>Classes</strong>
+            <span id="classCount" class="muted">0 classes</span>
+          </div>
+        </div>
+        <div class="class-add">
+          <input id="classInput" type="text" maxlength="40" placeholder="Add a class, e.g. door" aria-label="New class name">
+          <button id="addClassBtn" class="button tiny" type="button">Add</button>
+        </div>
+        <div id="classList" class="class-list"></div>
+        <div class="hint">Click a class to make it active. Keys <kbd>1</kbd>–<kbd>9</kbd> switch classes. Double-click a name to rename.</div>
+      </section>
+
+      <section class="panel pages-panel">
+        <div class="panel-head">
+          <div>
+            <strong>Pages</strong>
+            <span id="pageCount" class="muted">No PDF loaded</span>
+          </div>
+        </div>
+        <div id="pageList" class="page-list"></div>
+      </section>
+
+      <section class="sidebar-foot">
+        <div class="progress-line">
+          <span id="progressText">0 boxes</span>
+          <span id="fileState" class="muted">No file</span>
+        </div>
+        <button id="resetBtn" class="text-button danger" type="button">Clear this file’s annotations</button>
+        <div class="shortcut-hint">
+          <kbd>V</kbd> select · <kbd>B</kbd> box · <kbd>Del</kbd> delete · <kbd>Ctrl</kbd><kbd>Z</kbd> undo
+        </div>
+      </section>
+    </aside>
+
+    <section class="workspace" aria-label="Drawing viewer and annotation canvas">
+      <div class="viewer-toolbar">
+        <div class="toolbar-left">
+          <button id="selectTool" class="tool-button active" type="button" aria-pressed="true" title="Select and edit boxes (V)">Select</button>
+          <button id="drawTool" class="tool-button" type="button" aria-pressed="false" title="Draw a box (B)">Box</button>
+          <span class="toolbar-sep" aria-hidden="true"></span>
+          <button id="prevBtn" class="icon-button" type="button" aria-label="Previous page">←</button>
+          <span id="pageIndicator" class="page-indicator">—</span>
+          <button id="nextBtn" class="icon-button" type="button" aria-label="Next page">→</button>
+        </div>
+        <div class="toolbar-center" id="previewLabel">No page loaded</div>
+        <div class="toolbar-right">
+          <button id="undoBtn" class="icon-button" type="button" aria-label="Undo" title="Undo (Ctrl+Z)">↶</button>
+          <button id="redoBtn" class="icon-button" type="button" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">↷</button>
+          <span class="toolbar-sep" aria-hidden="true"></span>
+          <button id="zoomOutBtn" class="icon-button" type="button" aria-label="Zoom out">−</button>
+          <span id="zoomLabel" class="zoom-label">100%</span>
+          <button id="zoomInBtn" class="icon-button" type="button" aria-label="Zoom in">+</button>
+          <button id="fitBtn" class="button tiny" type="button">Fit</button>
+          <button id="toggleBoxesBtn" class="button tiny" type="button" aria-pressed="true">Hide boxes</button>
+        </div>
+      </div>
+
+      <div id="stage" class="stage">
+        <div id="emptyState" class="empty-state">
+          <div class="empty-art" aria-hidden="true"></div>
+          <h2>Load a drawing to start labeling</h2>
+          <p>Upload a PDF, define the object classes, and draw a bounding box around each symbol or element. Export a YOLO or COCO dataset when you are done.</p>
+        </div>
+        <div id="canvasWrap" class="canvas-wrap" hidden>
+          <canvas id="pdfCanvas" aria-label="Rendered PDF page"></canvas>
+          <canvas id="overlayCanvas" aria-label="Annotation boxes"></canvas>
+        </div>
+      </div>
+
+      <div class="viewer-foot">
+        <span id="viewerStatus">Local-only. Files never leave this browser.</span>
+        <span id="labelSummary" class="label-summary"></span>
+      </div>
+    </section>
+
+    <aside class="sidebar right-sidebar">
+      <section class="panel inspector-panel">
+        <div class="panel-head"><strong>Selected box</strong></div>
+        <div id="selectedEmpty" class="empty-inspector">Draw a box or click an existing one.</div>
+        <div id="selectedPanel" class="selected-panel" hidden>
+          <label for="selClass">Class</label>
+          <select id="selClass"></select>
+          <div class="coord-grid">
+            <div><span>x</span><strong id="selX">—</strong></div>
+            <div><span>y</span><strong id="selY">—</strong></div>
+            <div><span>w</span><strong id="selW">—</strong></div>
+            <div><span>h</span><strong id="selH">—</strong></div>
+          </div>
+          <div class="inspector-actions">
+            <button id="duplicateBoxBtn" class="button tiny" type="button">Duplicate</button>
+            <button id="ignoreBoxBtn" class="button tiny" type="button" aria-pressed="false">Ignore</button>
+            <button id="deleteBoxBtn" class="button tiny danger" type="button">Delete</button>
+          </div>
+          <div class="hint">Arrow keys nudge. Hold <kbd>Shift</kbd> for 10×.</div>
+        </div>
+      </section>
+
+      <section class="panel boxes-panel">
+        <div class="panel-head">
+          <div>
+            <strong>Boxes on this page</strong>
+            <span id="boxCount" class="muted">0</span>
+          </div>
+          <select id="boxFilter" class="filter-select" aria-label="Filter boxes by class">
+            <option value="">All classes</option>
+          </select>
+        </div>
+        <div id="boxList" class="box-list"></div>
+      </section>
+
+      <section class="panel page-panel">
+        <div class="panel-head"><strong>Page status</strong></div>
+        <button id="pageStatusBtn" class="button full" type="button">Mark page complete</button>
+        <button id="clearPageBtn" class="text-button danger" type="button">Clear boxes on this page</button>
+        <div class="hint">Use status to track which sheets have been reviewed.</div>
+      </section>
+
+      <section class="panel export-panel">
+        <div class="panel-head"><strong>Export for training</strong></div>
+        <label for="exportLongEdge">Image long edge</label>
+        <select id="exportLongEdge" class="full-select">
+          <option value="1200">1200 px</option>
+          <option value="2000" selected>2000 px</option>
+          <option value="3000">3000 px</option>
+        </select>
+        <div class="export-actions">
+          <button id="exportDatasetBtn" class="button primary full" type="button">Download dataset ZIP</button>
+          <button id="exportYoloBtn" class="button full" type="button">YOLO labels ZIP</button>
+          <button id="exportCocoBtn" class="button full" type="button">COCO JSON</button>
+        </div>
+        <div id="exportProgress" class="export-progress" hidden></div>
+        <div class="hint">ZIP contains rendered page images, YOLO labels, classes, data.yaml, COCO JSON, and the project JSON. Boxes marked Ignore are omitted from labels.</div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
